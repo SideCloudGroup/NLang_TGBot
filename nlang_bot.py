@@ -17,6 +17,8 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def load_config(path: str = "config.toml") -> dict:
@@ -32,6 +34,8 @@ async def nl_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # 限制只在允许的群组中使用
     chat_id = update.effective_chat.id
     if chat_id not in allowed_ids:
+        if update.effective_message:
+            await update.effective_message.reply_text("⚠️ 没有权限")
         return
 
     if not context.args:
@@ -39,6 +43,7 @@ async def nl_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
 
     abbrev = context.args[0].strip()
+    logger.info("收到查询请求 chat_id=%s abbrev=%s", chat_id, abbrev)
     endpoint: str = config["server"]["endpoint"].rstrip("/")
     safe_abbrev = quote(abbrev, safe="")
     url = f"{endpoint}/api/collections/nlang_entries/records?filter=(abbrev='{safe_abbrev}')"
