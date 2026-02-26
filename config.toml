@@ -1,0 +1,9 @@
+[bot]
+token = "YOUR_BOT_TOKEN_HERE"
+
+[server]
+endpoint = "https://your-web-endpoint.example.com"
+timeout = 10
+
+[groups]
+allowed_ids = [-1001234567890]
