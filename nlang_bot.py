@@ -9,8 +9,8 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram import InlineQueryResultArticle, InputTextMessageContent, Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, InlineQueryHandler
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -78,6 +78,55 @@ async def nl_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text("\n".join(lines))
 
 
+async def nl_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """处理 inline query，通过 @botname <缩写> 直接查询 NLang 词条。"""
+    abbrev = update.inline_query.query.strip()
+    if not abbrev:
+        await update.inline_query.answer([])
+        return
+
+    config: dict = context.bot_data["config"]
+    endpoint: str = config["server"]["endpoint"].rstrip("/")
+    url = f"{endpoint}/api/nlang/query"
+    timeout: float = config["server"].get("timeout", 10)
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(url, params={"abbrev": abbrev})
+            response.raise_for_status()
+            data = response.json()
+    except Exception as exc:
+        logger.exception("inline query 查询时发生错误：%s", exc)
+        await update.inline_query.answer([])
+        return
+
+    items: list = data.get("items", [])
+    if not items:
+        result = InlineQueryResultArticle(
+            id="not_found",
+            title=f"未找到「{abbrev}」的相关词条",
+            input_message_content=InputTextMessageContent(
+                f"🔍 未找到缩写「{abbrev}」的相关词条。"
+            ),
+        )
+        await update.inline_query.answer([result])
+        return
+
+    lines = [f"🔤 缩写「{abbrev}」的含义如下：\n"]
+    for idx, item in enumerate(items, start=1):
+        meaning = item.get("meaning", "（无）")
+        lines.append(f"  {idx}. {meaning}")
+
+    description = ", ".join(m for item in items[:3] if (m := item.get("meaning")))
+    result = InlineQueryResultArticle(
+        id=str(hash(abbrev)),
+        title=f"缩写「{abbrev}」的含义",
+        description=description,
+        input_message_content=InputTextMessageContent("\n".join(lines)),
+    )
+    await update.inline_query.answer([result])
+
+
 def main() -> None:
     try:
         config = load_config()
@@ -94,6 +143,7 @@ def main() -> None:
     app.bot_data["config"] = config
 
     app.add_handler(CommandHandler("nl", nl_command))
+    app.add_handler(InlineQueryHandler(nl_inline_query))
 
     logger.info("NLang TGBot 已启动，等待指令中……")
     app.run_polling(drop_pending_updates=True)
