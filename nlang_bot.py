@@ -46,12 +46,12 @@ async def nl_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     logger.info("收到查询请求 chat_id=%s abbrev=%s", chat_id, abbrev)
     endpoint: str = config["server"]["endpoint"].rstrip("/")
     safe_abbrev = quote(abbrev, safe="")
-    url = f"{endpoint}/api/collections/nlang_entries/records?filter=(abbrev='{safe_abbrev}')"
+    url = f"{endpoint}/api/nlang/query"
     timeout: float = config["server"].get("timeout", 10)
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(url)
+            response = await client.get(url, params={'abbrev': safe_abbrev})
             response.raise_for_status()
             data = response.json()
     except httpx.TimeoutException:
