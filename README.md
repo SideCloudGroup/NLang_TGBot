@@ -26,8 +26,8 @@ allowed_ids = [-1001234567890]
 ## 本地运行
 
 ```bash
-pip3 install -r requirements.txt
-python3 nlang_bot.py
+python -m pip install .
+python nlang_bot.py
 ```
 
 ## Docker 运行
@@ -38,10 +38,27 @@ python3 nlang_bot.py
 docker build -t nlang-tgbot .
 ```
 
-运行容器（挂载配置文件）：
+运行容器（映射本地同名配置文件）：
 
 ```bash
-docker run -d nlang-tgbot
+# Windows PowerShell
+docker run -d --name=nl -v "${PWD}\\config.toml:/app/config.toml:ro" nlang-tgbot
+
+# Linux/macOS
+docker run -d --name=nl -v "$(pwd)/config.toml:/app/config.toml:ro" nlang-tgbot
+```
+
+
+## 直接使用远程镜像
+
+无需本地构建，直接运行远程镜像（同样映射配置文件）：
+
+```bash
+# Windows PowerShell
+docker run -d --name=nl -v "${PWD}\\config.toml:/app/config.toml:ro" ghcr.io/sidecloudgroup/nlang_tgbot:latest
+
+# Linux/macOS
+docker run -d --name=nl -v "$(pwd)/config.toml:/app/config.toml:ro" ghcr.io/sidecloudgroup/nlang_tgbot:latest
 ```
 
 ## 说明
