@@ -1,6 +1,5 @@
 import logging
 import sys
-from urllib.parse import quote
 
 import httpx
 
@@ -45,13 +44,12 @@ async def nl_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     abbrev = context.args[0].strip()
     logger.info("收到查询请求 chat_id=%s abbrev=%s", chat_id, abbrev)
     endpoint: str = config["server"]["endpoint"].rstrip("/")
-    safe_abbrev = quote(abbrev, safe="")
-    url = f"{endpoint}/api/nlang/query"
+    url = f"{endpoint}/api/entries"
     timeout: float = config["server"].get("timeout", 10)
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(url, params={'abbrev': safe_abbrev})
+            response = await client.get(url, params={"abbr": abbrev})
             response.raise_for_status()
             data = response.json()
     except httpx.TimeoutException:
@@ -65,15 +63,15 @@ async def nl_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text("⚠️ 查询时发生未知错误，请稍后再试。")
         return
 
-    items: list = data.get("items", [])
+    items: list = data if isinstance(data, list) else []
     if not items:
         await update.message.reply_text(f"🔍 未找到缩写「{abbrev}」的相关词条。")
         return
 
     lines = [f"🔤 缩写「{abbrev}」的含义如下：\n"]
     for idx, item in enumerate(items, start=1):
-        meaning = item.get("meaning", "（无）")
-        lines.append(f"  {idx}. {meaning}")
+        value = item.get("value", "（无）")
+        lines.append(f"  {idx}. {value}")
 
     await update.message.reply_text("\n".join(lines))
 
@@ -87,12 +85,12 @@ async def nl_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     config: dict = context.bot_data["config"]
     endpoint: str = config["server"]["endpoint"].rstrip("/")
-    url = f"{endpoint}/api/nlang/query"
+    url = f"{endpoint}/api/entries"
     timeout: float = config["server"].get("timeout", 10)
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(url, params={"abbrev": abbrev})
+            response = await client.get(url, params={"abbr": abbrev})
             response.raise_for_status()
             data = response.json()
     except Exception as exc:
@@ -100,7 +98,7 @@ async def nl_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.inline_query.answer([])
         return
 
-    items: list = data.get("items", [])
+    items: list = data if isinstance(data, list) else []
     if not items:
         result = InlineQueryResultArticle(
             id="not_found",
@@ -114,10 +112,10 @@ async def nl_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     lines = [f"🔤 缩写「{abbrev}」的含义如下：\n"]
     for idx, item in enumerate(items, start=1):
-        meaning = item.get("meaning", "（无）")
-        lines.append(f"  {idx}. {meaning}")
+        value = item.get("value", "（无）")
+        lines.append(f"  {idx}. {value}")
 
-    description = ", ".join(m for item in items[:3] if (m := item.get("meaning")))
+    description = ", ".join(m for item in items[:3] if (m := item.get("value")))
     result = InlineQueryResultArticle(
         id=str(hash(abbrev)),
         title=f"缩写「{abbrev}」的含义",
